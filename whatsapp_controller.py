@@ -205,21 +205,11 @@ def interface():
     mensagem_text = Text(frame_envio, height=10)
     mensagem_text.pack(fill=BOTH, expand=True, pady=5)
     
-    # Anexo
-    ttk.Label(frame_envio, text="Anexar imagem:").pack(anchor=W)
-    arquivo_frame = ttk.Frame(frame_envio)
-    arquivo_frame.pack(fill=X)
-    
-    arquivo_entry = ttk.Entry(arquivo_frame)
-    arquivo_entry.pack(side=LEFT, fill=X, expand=True)
-    ttk.Button(arquivo_frame, text="Procurar", command=lambda: procurar_arquivo(arquivo_entry)).pack(side=LEFT)
-    
     # Botão Enviar
     ttk.Button(frame_envio, text="ENVIAR PARA CONTATOS SELECIONADOS", 
               command=lambda: enviar_mensagens(
                   [c['numero'] for c in obter_selecionados(listbox_contatos, carregar_contatos)],
-                  mensagem_text.get("1.0", END),
-                  arquivo_entry.get()
+                  mensagem_text.get("1.0", END)
               )).pack(pady=10)
     
     # Carrega dados iniciais
@@ -230,13 +220,7 @@ def interface():
     root.mainloop()
 
 # ========== FUNÇÕES DE ENVIO ==========
-def procurar_arquivo(entry):
-    arquivo = filedialog.askopenfilename()
-    if arquivo:
-        entry.delete(0, END)
-        entry.insert(0, arquivo)
-
-def enviar_mensagens(contatos, mensagem, arquivo):
+def enviar_mensagens(contatos, mensagem):
     if not contatos:
         messagebox.showerror('Erro', 'Nenhum contato selecionado!')
         return
