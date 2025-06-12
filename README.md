@@ -35,8 +35,8 @@ Conta no WhatsApp Web
 Clone o repositório:
 
 bash
-git clone https://github.com/seu-usuario/whatsapp-sender-pro.git
-cd whatsapp-sender-pro
+git clone https://github.com/seu-usuario/whatsapp-pykit.git
+cd whatsapp-pykit
 Instale as dependências:
 
 bash
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 Execute o aplicativo:
 
 bash
-python whatsapp_sender.py
+whatsapp-pykit.py
 
 ## 🚀 Como Usar
 Primeiro Uso:
