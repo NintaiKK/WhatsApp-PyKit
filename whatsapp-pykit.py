@@ -29,7 +29,6 @@ def carregar_contatos():
     tree = ET.parse(CONTATOS_FILE)
     return [{
         'nome': c.find('Nome').text,
-        'empresa': c.find('Empresa').text,
         'numero': c.find('Numero').text
     } for c in tree.findall('Contato')]
 
@@ -38,7 +37,6 @@ def salvar_contatos(contatos):
     for c in contatos:
         contato = ET.SubElement(root, "Contato")
         ET.SubElement(contato, "Nome").text = c['nome']
-        ET.SubElement(contato, "Empresa").text = c['empresa']
         ET.SubElement(contato, "Numero").text = c['numero']
     ET.ElementTree(root).write(CONTATOS_FILE)
 
@@ -94,10 +92,9 @@ def editar_item(tipo, listbox, carregar_fn, salvar_fn):
     
     if tipo == "contato":
         nome = simpledialog.askstring("Editar Contato", "Nome:", initialvalue=item['nome'])
-        empresa = simpledialog.askstring("Editar Contato", "Empresa:", initialvalue=item['empresa'])
         numero = simpledialog.askstring("Editar Contato", "Número:", initialvalue=item['numero'])
         if nome and numero:
-            itens[selecionado[0]] = {'nome': nome, 'empresa': empresa or "", 'numero': numero}
+            itens[selecionado[0]] = {'nome': nome, 'numero': numero}
     else:
         titulo = simpledialog.askstring("Editar Mensagem", "Título:", initialvalue=item['titulo'])
         texto = simpledialog.askstring("Editar Mensagem", "Texto:", initialvalue=item['texto'])
@@ -121,7 +118,7 @@ def atualizar_lista(listbox, carregar_fn):
     listbox.delete(0, END)
     for item in carregar_fn():
         if 'numero' in item:  # É um contato
-            listbox.insert(END, f"{item['nome']} | {item['empresa']} | {item['numero']}")
+            listbox.insert(END, f"{item['nome']} | {item['numero']}")
         else:  # É uma mensagem
             listbox.insert(END, f"{item['titulo']}")
 
@@ -135,6 +132,36 @@ def inserir_mensagem_selecionada(event, listbox_mensagens, text_widget):
     if selecionados:
         text_widget.delete("1.0", END)
         text_widget.insert("1.0", selecionados[0]['texto'])
+
+# ========== FUNÇÕES PARA SELEÇÃO NA ABA ENVIO ==========
+def selecionar_contatos_para_envio(listbox_contatos_origem, listbox_contatos_destino):
+    """Seleciona contatos da aba de gerenciamento para a aba de envio"""
+    selecionados = obter_selecionados(listbox_contatos_origem, carregar_contatos)
+    if not selecionados:
+        messagebox.showwarning("Aviso", "Nenhum contato selecionado!")
+        return
+    
+    # Limpa a lista atual
+    listbox_contatos_destino.delete(0, END)
+    
+    # Adiciona os contatos selecionados
+    for contato in selecionados:
+        listbox_contatos_destino.insert(END, f"{contato['nome']} | {contato['numero']}")
+    
+    messagebox.showinfo("Sucesso", f"{len(selecionados)} contato(s) selecionado(s)!")
+
+def selecionar_mensagem_para_envio(listbox_mensagens_origem, text_widget):
+    """Seleciona uma mensagem da aba de gerenciamento para a aba de envio"""
+    selecionados = obter_selecionados(listbox_mensagens_origem, carregar_mensagens)
+    if not selecionados:
+        messagebox.showwarning("Aviso", "Nenhuma mensagem selecionada!")
+        return
+    
+    # Insere a mensagem selecionada no editor
+    text_widget.delete("1.0", END)
+    text_widget.insert("1.0", selecionados[0]['texto'])
+    
+    messagebox.showinfo("Sucesso", "Mensagem selecionada!")
 
 # ========== INTERFACE PRINCIPAL ==========
 def interface():
@@ -190,6 +217,27 @@ def interface():
     frame_envio = ttk.Frame(notebook)
     notebook.add(frame_envio, text="Enviar Mensagens")
     
+    # Frame para botões de seleção
+    frame_selecao = ttk.Frame(frame_envio)
+    frame_selecao.pack(fill=X, pady=5)
+    
+    # Botão para selecionar contatos
+    ttk.Button(frame_selecao, text="SELECIONAR CONTATOS",
+              command=lambda: selecionar_contatos_para_envio(listbox_contatos, listbox_contatos_envio)).pack(side=LEFT, padx=5)
+    
+    # Botão para selecionar mensagem
+    ttk.Button(frame_selecao, text="SELECIONAR MENSAGEM", 
+              command=lambda: selecionar_mensagem_para_envio(listbox_mensagens, mensagem_text)).pack(side=LEFT, padx=5)
+    
+    # Lista de contatos selecionados para envio
+    ttk.Label(frame_envio, text="Contatos Selecionados para Envio:").pack(anchor=W)
+    listbox_contatos_envio = Listbox(frame_envio, height=5)
+    scroll_contatos_envio = Scrollbar(frame_envio, command=listbox_contatos_envio.yview)
+    listbox_contatos_envio.config(yscrollcommand=scroll_contatos_envio.set)
+    
+    scroll_contatos_envio.pack(side=RIGHT, fill=Y)
+    listbox_contatos_envio.pack(fill=X, pady=5)
+    
     # Seleção de Mensagem
     ttk.Label(frame_envio, text="Mensagens Pré-definidas:").pack(anchor=W)
     listbox_msg_envio = Listbox(frame_envio, height=5)
@@ -208,7 +256,7 @@ def interface():
     # Botão Enviar
     ttk.Button(frame_envio, text="ENVIAR PARA CONTATOS SELECIONADOS", 
               command=lambda: enviar_mensagens(
-                  [c['numero'] for c in obter_selecionados(listbox_contatos, carregar_contatos)],
+                  obter_numeros_para_envio(listbox_contatos_envio),
                   mensagem_text.get("1.0", END)
               )).pack(pady=10)
     
@@ -218,6 +266,21 @@ def interface():
     atualizar_lista(listbox_msg_envio, carregar_mensagens)
     
     root.mainloop()
+
+# ========== FUNÇÕES AUXILIARES PARA ENVIO ==========
+def obter_numeros_para_envio(listbox_contatos_envio):
+    """Extrai os números dos contatos selecionados na aba de envio"""
+    numeros = []
+    contatos = carregar_contatos()
+    
+    # Para cada item na lista de envio
+    for i in range(listbox_contatos_envio.size()):
+        item_text = listbox_contatos_envio.get(i)
+        # Extrai o número do texto do item (última parte após o último "|")
+        numero = item_text.split("|")[-1].strip()
+        numeros.append(numero)
+    
+    return numeros
 
 # ========== FUNÇÕES DE ENVIO ==========
 def enviar_mensagens(contatos, mensagem):
@@ -245,15 +308,9 @@ def enviar_mensagens(contatos, mensagem):
                 search.send_keys(contato)
                 time.sleep(2)
                 
-                contato_element = navegador.find_element(By.XPATH, f'//span[@title="{contato}"]')
+                contato_element = navegador.find_element(By.XPATH, '//*[@id="pane-side"]/div[1]/div/div/div[2]')
                 contato_element.click()
                 time.sleep(1)
-                
-                if arquivo:
-                    navegador.find_element(By.XPATH, '//div[@title="Anexar"]').click()
-                    time.sleep(1)
-                    navegador.find_element(By.XPATH, '//input[@accept="*"]').send_keys(os.path.abspath(arquivo))
-                    time.sleep(3)
                 
                 msg_box = navegador.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
                 msg_box.send_keys(mensagem + Keys.ENTER)
